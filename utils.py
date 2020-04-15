@@ -1,15 +1,11 @@
 import torch
 import numpy as np
-import torchvision.transforms as transforms
 import re
 import unicodedata
 import random
-from nltk.translate.bleu_score import sentence_bleu
+import nltk
 from tqdm import tqdm
-normalization = transforms.Compose(
-    [transforms.ToTensor(),
-     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-
+from nltk.translate.bleu_score import SmoothingFunction
 
 def train(args, lang1, lang2, e_optimizer, d_optimizer, encoder, decoder, loss_function, lang1_tokens, lang2_tokens):
     total_loss = 0
@@ -31,10 +27,24 @@ def train(args, lang1, lang2, e_optimizer, d_optimizer, encoder, decoder, loss_f
 
         decoder_in = torch.tensor([[0]])
         decoder_hidden = encoder_hidden
-        for input in range(target_length):
-            decoder_out, decoder_hidden = decoder(decoder_in, decoder_hidden, encoder_outs)
-            loss += loss_function(decoder_out, y_tensor[input])
-            decoder_in = y_tensor[input]
+        if random.random() > .5:
+            teacher_forcing = True
+        else:
+            teacher_forcing = False
+        if teacher_forcing:
+            for input in range(target_length):
+                decoder_out, decoder_hidden = decoder(decoder_in, decoder_hidden, encoder_outs)
+                loss += loss_function(decoder_out, y_tensor[input])
+                decoder_in = y_tensor[input]
+        else:
+            for input in range(target_length):
+                decoder_out, decoder_hidden = decoder(decoder_in, decoder_hidden, encoder_outs)
+                topv, topi = decoder_out.topk(1)
+                decoder_in = topi.squeeze().detach()  # detach from history as input
+                loss += loss_function(decoder_out, y_tensor[input])
+                if decoder_in.item() == 1:
+                    break
+
         # Backpropogation
         loss.backward()
 
@@ -44,20 +54,21 @@ def train(args, lang1, lang2, e_optimizer, d_optimizer, encoder, decoder, loss_f
 
         # Add loss for this set of inputs
         total_loss += loss.item()
-        if i%1000==0:
-            print(total_loss/(i+1))
-        #print(sentence_bleu(references=1, hypothesis=0, smoothing_function=1))
+        if i%1000 == 0 and i > 0:
+            print(total_loss)
+            total_loss = 0
 
 
 def test(args, encoder, decoder, lang1, lang2, lang1_sentences, lang2_sentences):
-    translated_words = []
     sentences = [unicodeToAscii(i).split(' ') for i in lang1_sentences]
     tokenized = [[lang1.word_dict_lookup(i) for i in j] for j in sentences]
+    lang_2_sentences = [unicodeToAscii(i).split(' ') for i in lang2_sentences]
     tensors = [torch.tensor(i).view(-1, 1) for i in tokenized]
     bleu_scores = []
-    for tensor, sentence in zip(tensors, sentences):
+    for tensor, sentence in zip(tensors, lang_2_sentences):
         encoder_hidden = encoder.Hidden()
         input_length = tensor.size(0)
+        output_length = len(sentence)
         encoder_outs = torch.zeros(args.max_length, encoder.hidden_size)
         for input in range(input_length):
             e_out, e_hidden = encoder(tensor[input], encoder_hidden)
@@ -65,13 +76,19 @@ def test(args, encoder, decoder, lang1, lang2, lang1_sentences, lang2_sentences)
 
         decoder_in = torch.tensor([[0]])
         decoder_hidden = encoder_hidden
-        for input in range(args.max_length):
+        translated_words = ""
+        for input in tqdm(range(output_length)):
             decoder_out, decoder_hidden = decoder(decoder_in, decoder_hidden, encoder_outs)
             value, index = decoder_out.data.topk(1)
             if index is 0:
                 break
-            translated_words.append(lang2.index_dict[index.item()])
-        bleu_scores.append(sentence_bleu(references=sentence, hypothesis=translated_words, smoothing_function=1))
+            translated_words += lang2.index_dict[index.item()]
+            translated_words += " "
+        translated_words=translated_words[:-1]
+        translated_words += ' .'
+        translated_words = translated_words.split(' ')
+        BLEUscore = nltk.translate.bleu_score.sentence_bleu([sentence], translated_words, smoothing_function=SmoothingFunction().method1)
+        bleu_scores.append(BLEUscore)
     print(np.average(bleu_scores))
 
 

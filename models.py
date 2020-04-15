@@ -8,7 +8,7 @@ class Encoder(nn.Module):
         self.hidden_size = args.hidden_size
         self.input_size = input_size
         self.embedding = nn.Embedding(self.input_size, self.hidden_size)
-        self.rnn = nn.LSTM(self.hidden_size, self.hidden_size)
+        self.rnn = nn.GRU(self.hidden_size, self.hidden_size)
 
     def forward(self, x, hidden):
         x = self.embedding(x).view(1, 1, -1)
@@ -24,7 +24,7 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.hidden_size = args.hidden_size
         self.embedding = nn.Embedding(output_size, self.hidden_size)
-        self.rnn = nn.LSTM(self.hidden_size, self.hidden_size)
+        self.rnn = nn.GRU(self.hidden_size, self.hidden_size)
         self.softmax_layer = nn.LogSoftmax(dim=1)
         self.output_layer = nn.Linear(self.hidden_size, output_size)
 

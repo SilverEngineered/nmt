@@ -8,7 +8,6 @@ from models import Encoder, Decoder
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--hidden_size', dest='hidden_size', default=200)
-parser.add_argument('--output_size', dest='output_size', default=30)
 parser.add_argument('--epochs', dest='epochs', type=int, default=100000)
 parser.add_argument('--lr', dest='lr', default=.01)
 parser.add_argument('--max_length', dest='max_length', default=30)
@@ -25,6 +24,7 @@ English_tokens = [English.tokens_from_line(i) for i in English_sentences]
 Vietnamese_tokens = [Vietnamese.tokens_from_line(i) for i in Vietnamese_sentences]
 encoder = Encoder(args, input_size=English.num_words)
 decoder = Decoder(args, output_size=Vietnamese.num_words)
+args.output_size = Vietnamese.num_words
 if 'train' in args.mode:
     if args.checkpoint is True:
         encoder.load_state_dict(torch.load(os.path.join('model', 'encoder.pkl')))

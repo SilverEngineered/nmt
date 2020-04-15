@@ -40,7 +40,7 @@ def train(args, lang1, lang2, e_optimizer, d_optimizer, encoder, decoder, loss_f
             for input in range(target_length):
                 decoder_out, decoder_hidden = decoder(decoder_in, decoder_hidden, encoder_outs)
                 topv, topi = decoder_out.topk(1)
-                decoder_in = topi.squeeze().detach()  # detach from history as input
+                decoder_in = topi.squeeze().detach()
                 loss += loss_function(decoder_out, y_tensor[input])
                 if decoder_in.item() == 1:
                     break

@@ -55,8 +55,7 @@ def train(args, lang1, lang2, e_optimizer, d_optimizer, encoder, decoder, loss_f
         # Add loss for this set of inputs
         total_loss += loss.item()
         if i%1000 == 0 and i > 0:
-            print(total_loss)
-            total_loss = 0
+            print(total_loss/i)
 
 
 def test(args, encoder, decoder, lang1, lang2, lang1_sentences, lang2_sentences):

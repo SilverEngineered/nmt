@@ -6,56 +6,66 @@ import random
 import nltk
 from tqdm import tqdm
 from nltk.translate.bleu_score import SmoothingFunction
+import torch.nn as nn
 
-def train(args, lang1, lang2, e_optimizer, d_optimizer, encoder, decoder, loss_function, lang1_tokens, lang2_tokens):
-    total_loss = 0
-    for i in tqdm(range(args.epochs)):
-        loss = 0
+
+def train_handler(args, encoder, decoder, lang1_tokens, lang2_tokens, lang1, lang2):
+    e_optimizer = torch.optim.SGD(encoder.parameters(), lr=args.lr)
+    d_optimizer = torch.optim.SGD(decoder.parameters(), lr=args.lr)
+    loss_function = nn.NLLLoss()
+    loss = 0
+    for i in tqdm(range(1, args.epochs)):
         x_tensor, y_tensor = fetch_random_tensor(lang1_tokens, lang2_tokens, lang1, lang2)
-        encoder_hidden = encoder.Hidden()
-        # initialize optimizer to zero gradients
-        e_optimizer.zero_grad()
-        d_optimizer.zero_grad()
-        # pass data through model
+        loss += train(args,x_tensor, y_tensor, encoder, decoder, e_optimizer, d_optimizer, loss_function)
+        if i% 1000 == 0:
+            print(loss/1000)
+            loss = 0
 
-        input_length = x_tensor.size(0)
-        target_length = y_tensor.size(0)
-        encoder_outs = torch.zeros(args.max_length, encoder.hidden_size)
-        for input in range(input_length):
-            e_out, e_hidden = encoder(x_tensor[input], encoder_hidden)
-            encoder_outs[input] = e_out[0, 0]
 
-        decoder_in = torch.tensor([[0]])
-        decoder_hidden = encoder_hidden
-        if random.random() > .5:
-            teacher_forcing = True
-        else:
-            teacher_forcing = False
-        if teacher_forcing:
-            for input in range(target_length):
-                decoder_out, decoder_hidden = decoder(decoder_in, decoder_hidden, encoder_outs)
-                loss += loss_function(decoder_out, y_tensor[input])
-                decoder_in = y_tensor[input]
-        else:
-            for input in range(target_length):
-                decoder_out, decoder_hidden = decoder(decoder_in, decoder_hidden, encoder_outs)
-                topv, topi = decoder_out.topk(1)
-                decoder_in = topi.squeeze().detach()
-                loss += loss_function(decoder_out, y_tensor[input])
-                if decoder_in.item() == 1:
-                    break
+def train(args, x_tensor, y_tensor, encoder, decoder, e_optimizer, d_optimizer, loss_function):
+    encoder_hidden = encoder.Hidden()
+    loss = 0
+    # initialize optimizer to zero gradients
+    e_optimizer.zero_grad()
+    d_optimizer.zero_grad()
 
-        # Backpropogation
-        loss.backward()
+    input_length = x_tensor.size(0)
+    target_length = y_tensor.size(0)
+    encoder_outs = torch.zeros(args.max_length, encoder.hidden_size)
 
-        # Optimize
-        e_optimizer.step()
-        d_optimizer.step()
+    for j in range(input_length):
+        e_out, encoder_hidden = encoder(x_tensor[j], encoder_hidden)
+        encoder_outs[j] = e_out[0, 0]
+    decoder_in = torch.tensor([[0]])
+    decoder_hidden = encoder_hidden
 
-        # Add loss for this set of inputs
-        total_loss += loss.item()
-        if i%1000 == 0 and i > 0:
-            print(total_loss/i)
+    if random.random() > .5:
+        teacher_forcing = True
+    else:
+        teacher_forcing = False
+
+    if teacher_forcing:
+        for j in range(target_length):
+            decoder_out, decoder_hidden, attention = decoder(decoder_in, decoder_hidden, encoder_outs)
+            loss += loss_function(decoder_out, y_tensor[j])
+            decoder_in = y_tensor[j]
+    else:
+        for j in range(target_length):
+            decoder_out, decoder_hidden, attention = decoder(decoder_in, decoder_hidden, encoder_outs)
+            topv, topi = decoder_out.topk(1)
+            decoder_in = topi.squeeze().detach()
+            loss += loss_function(decoder_out, y_tensor[j])
+            if decoder_in.item() == 1:
+                break
+
+    # Backpropogation
+    loss.backward()
+
+    # Optimize
+    e_optimizer.step()
+    d_optimizer.step()
+
+    return loss.item() / target_length
 
 
 def test(args, encoder, decoder, lang1, lang2, lang1_sentences, lang2_sentences):
@@ -172,7 +182,6 @@ def translate(args, sentence, encoder, decoder, lang1, lang2):
     sentence = str(sentence)
     translated_words = []
     sentence = unicodeToAscii(sentence).split(' ')
-    #try:
     tokenized = [lang1.word_dict[i] for i in sentence]
     tensor = torch.tensor(tokenized).view(-1, 1)
     encoder_hidden = encoder.Hidden()

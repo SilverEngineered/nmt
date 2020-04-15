@@ -1,9 +1,8 @@
 import torch
-import torch.nn as nn
 import argparse
 import os
 import utils
-from models import Encoder, Decoder
+from models import Encoder, Decoder, AttnDecoderRNN
 
 
 parser = argparse.ArgumentParser()
@@ -23,16 +22,15 @@ Vietnamese = utils.LanguageModel("Vietnamese")
 English_tokens = [English.tokens_from_line(i) for i in English_sentences]
 Vietnamese_tokens = [Vietnamese.tokens_from_line(i) for i in Vietnamese_sentences]
 encoder = Encoder(args, input_size=English.num_words)
-decoder = Decoder(args, output_size=Vietnamese.num_words)
+#decoder = Decoder(args, output_size=Vietnamese.num_words)
+decoder = AttnDecoderRNN(args, output_size=Vietnamese.num_words)
+
 args.output_size = Vietnamese.num_words
 if 'train' in args.mode:
     if args.checkpoint is True:
         encoder.load_state_dict(torch.load(os.path.join('model', 'encoder.pkl')))
         decoder.load_state_dict(torch.load(os.path.join('model', 'decoder.pkl')))
-    loss_function = nn.NLLLoss()
-    e_optimizer = torch.optim.Adam(encoder.parameters(), lr=args.lr)
-    d_optimizer = torch.optim.Adam(decoder.parameters(), lr=args.lr)
-    utils.train(args, English, Vietnamese, e_optimizer, d_optimizer, encoder, decoder, loss_function, English_tokens, Vietnamese_tokens)
+    utils.train_handler(args, encoder, decoder, English_tokens, Vietnamese_tokens, English, Vietnamese)
     torch.save(encoder.state_dict(), os.path.join('model', 'encoder.pkl'))
     torch.save(decoder.state_dict(), os.path.join('model', 'decoder.pkl'))
 

@@ -80,7 +80,7 @@ def test(args, encoder, decoder, lang1, lang2, lang1_sentences, lang2_sentences)
         output_length = len(sentence)
         encoder_outs = torch.zeros(args.max_length, encoder.hidden_size)
         for input in range(input_length):
-            e_out, e_hidden = encoder(tensor[input], encoder_hidden)
+            e_out, encoder_hidden = encoder(tensor[input], encoder_hidden)
             encoder_outs[input] = e_out[0, 0]
 
         decoder_in = torch.tensor([[0]])

@@ -2,7 +2,7 @@ import torch
 import argparse
 import os
 import utils
-from models import Encoder, Decoder, AttnDecoderRNN
+from models import Encoder, Decoder
 
 
 parser = argparse.ArgumentParser()
@@ -22,8 +22,7 @@ Vietnamese = utils.LanguageModel("Vietnamese")
 English_tokens = [English.tokens_from_line(i) for i in English_sentences]
 Vietnamese_tokens = [Vietnamese.tokens_from_line(i) for i in Vietnamese_sentences]
 encoder = Encoder(args, input_size=English.num_words)
-#decoder = Decoder(args, output_size=Vietnamese.num_words)
-decoder = AttnDecoderRNN(args, output_size=Vietnamese.num_words)
+decoder = Decoder(args, output_size=Vietnamese.num_words)
 
 args.output_size = Vietnamese.num_words
 if 'train' in args.mode:
@@ -40,6 +39,7 @@ elif 'translate' in args.mode:
     encoder.eval()
     decoder.eval()
     while True:
+        print("Please Enter Input...")
         sentence = input()
         utils.translate(args, sentence, encoder, decoder, English, Vietnamese)
 elif 'test' in args.mode:

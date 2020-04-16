@@ -16,8 +16,8 @@ def train_handler(args, encoder, decoder, lang1_tokens, lang2_tokens, lang1, lan
     loss = 0
     for i in tqdm(range(1, args.epochs)):
         x_tensor, y_tensor = fetch_random_tensor(lang1_tokens, lang2_tokens, lang1, lang2)
-        loss += train(args,x_tensor, y_tensor, encoder, decoder, e_optimizer, d_optimizer, loss_function)
-        if i% 1000 == 0:
+        loss += train(args, x_tensor, y_tensor, encoder, decoder, e_optimizer, d_optimizer, loss_function)
+        if i % 1000 == 0:
             print(loss/1000)
             loss = 0
 
@@ -52,8 +52,8 @@ def train(args, x_tensor, y_tensor, encoder, decoder, e_optimizer, d_optimizer, 
     else:
         for j in range(target_length):
             decoder_out, decoder_hidden, attention = decoder(decoder_in, decoder_hidden, encoder_outs)
-            topv, topi = decoder_out.topk(1)
-            decoder_in = topi.squeeze().detach()
+            _, top_word = decoder_out.topk(1)
+            decoder_in = top_word.squeeze().detach()
             loss += loss_function(decoder_out, y_tensor[j])
             if decoder_in.item() == 1:
                 break
@@ -86,8 +86,8 @@ def test(args, encoder, decoder, lang1, lang2, lang1_sentences, lang2_sentences)
         decoder_in = torch.tensor([[0]])
         decoder_hidden = encoder_hidden
         translated_words = ""
-        for input in tqdm(range(output_length)):
-            decoder_out, decoder_hidden = decoder(decoder_in, decoder_hidden, encoder_outs)
+        for input in range(output_length):
+            decoder_out, decoder_hidden, _ = decoder(decoder_in, decoder_hidden, encoder_outs)
             value, index = decoder_out.data.topk(1)
             if index is 0:
                 break
@@ -188,7 +188,7 @@ def translate(args, sentence, encoder, decoder, lang1, lang2):
     input_length = tensor.size(0)
     encoder_outs = torch.zeros(args.max_length, encoder.hidden_size)
     for input in range(input_length):
-        e_out, e_hidden = encoder(tensor[input], encoder_hidden)
+        e_out, encoder_hidden = encoder(tensor[input], encoder_hidden)
         encoder_outs[input] = e_out[0, 0]
 
     decoder_in = torch.tensor([[0]])
@@ -196,7 +196,7 @@ def translate(args, sentence, encoder, decoder, lang1, lang2):
     for input in range(args.max_length):
         decoder_out, decoder_hidden = decoder(decoder_in, decoder_hidden, encoder_outs)
         value, index = decoder_out.data.topk(1)
-        if index is 0:
+        if index is 1:
             break
         translated_words.append(lang2.index_dict[index.item()])
         print(lang2.index_dict[index.item()])

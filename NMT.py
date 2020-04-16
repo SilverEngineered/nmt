@@ -29,6 +29,8 @@ if 'train' in args.mode:
     if args.checkpoint is True:
         encoder.load_state_dict(torch.load(os.path.join('model', 'encoder.pkl')))
         decoder.load_state_dict(torch.load(os.path.join('model', 'decoder.pkl')))
+        encoder.eval()
+        decoder.eval()
     utils.train_handler(args, encoder, decoder, English_tokens, Vietnamese_tokens, English, Vietnamese)
     torch.save(encoder.state_dict(), os.path.join('model', 'encoder.pkl'))
     torch.save(decoder.state_dict(), os.path.join('model', 'decoder.pkl'))
